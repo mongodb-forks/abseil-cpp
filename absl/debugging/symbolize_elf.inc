@@ -1530,6 +1530,9 @@ const char *Symbolizer::GetUncachedSymbol(const void *pc) {
         for (size_t j = 0; j < obj->phdr.size(); j++) {
           ElfW(Phdr) &p = obj->phdr[j];
           if (p.p_type != PT_LOAD) {
+            // We only expect PT_LOADs. This must be PT_NULL that we didn't
+            // write over (i.e. we exhausted all interesting PT_LOADs).
+            ABSL_RAW_CHECK(p.p_type == PT_NULL, "unexpected p_type");
             break;
           }
           if (pc_file_offset >= p.p_offset &&
