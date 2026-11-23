@@ -1517,7 +1517,28 @@ const char *Symbolizer::GetUncachedSymbol(const void *pc) {
         // Note: some binaries have multiple LOAD segments that can contain
         // function pointers. We must find the right one.
         ElfW(Phdr) *phdr = nullptr;
+        // `start_addr` is the start of the mapping that contains `pc`, not the
+        // load bias of the object, so comparing `pc` against
+        // `start_addr + p_vaddr + p_memsz` picks the wrong segment whenever
+        // `pc` is not in the first executable LOAD segment (e.g. in the extra
+        // text segment appended by post-link optimizers such as llvm-bolt).
+        // Prefer the segment whose file range contains the file offset of
+        // `pc`, and only fall back to the address-based heuristic if there is
+        // none.
+        const uint64_t pc_file_offset =
+            obj->offset + (reinterpret_cast<size_t>(pc) - start_addr);
         for (size_t j = 0; j < obj->phdr.size(); j++) {
+          ElfW(Phdr) &p = obj->phdr[j];
+          if (p.p_type != PT_LOAD) {
+            break;
+          }
+          if (pc_file_offset >= p.p_offset &&
+              pc_file_offset - p.p_offset < p.p_filesz) {
+            phdr = &p;
+            break;
+          }
+        }
+        for (size_t j = 0; phdr == nullptr && j < obj->phdr.size(); j++) {
           ElfW(Phdr) &p = obj->phdr[j];
           if (p.p_type != PT_LOAD) {
             // We only expect PT_LOADs. This must be PT_NULL that we didn't

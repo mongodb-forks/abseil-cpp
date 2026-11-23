@@ -138,6 +138,29 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "symbolize_multi_segment_test",
+    srcs = ["symbolize_multi_segment_test.cc"],
+    additional_linker_inputs = ["symbolize_multi_segment_test.ld"],
+    copts = ABSL_TEST_COPTS,
+    # Puts `.text_far_segment` in a second executable segment, which relies on a
+    # SECTIONS linker script. Not all linkers support that (mold and gold fail
+    # to link it), and Abseil does not control which linker a build uses, so the
+    # test is tagged "manual" to keep it out of wildcard builds like `//absl/...`.
+    # Run it explicitly with a linker that supports SECTIONS (e.g. lld):
+    #   bazel test --linkopt=-fuse-ld=lld //absl/debugging:symbolize_multi_segment_test
+    linkopts = ABSL_DEFAULT_LINKOPTS + [
+        "-Wl,-T,$(location symbolize_multi_segment_test.ld)",
+    ],
+    tags = ["manual"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":symbolize",
+        "//absl/base:core_headers",
+        "@googletest//:gtest",
+    ],
+)
+
 cc_library(
     name = "examine_stack",
     srcs = [
